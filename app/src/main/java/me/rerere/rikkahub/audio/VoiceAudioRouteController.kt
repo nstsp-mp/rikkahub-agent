@@ -23,7 +23,7 @@ class VoiceAudioRouteController(context: Context) {
 
         if (acquired) {
             return audioManager.communicationDevice
-                ?.let(Result<AudioDeviceInfo>::success)
+                ?.let { Result.success(it) }
                 ?: Result.failure(
                     IllegalStateException(
                         "Voice route is active but no communication device is selected"
