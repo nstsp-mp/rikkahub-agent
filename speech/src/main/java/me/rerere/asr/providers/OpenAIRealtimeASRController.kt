@@ -80,7 +80,7 @@ class OpenAIRealtimeASRController(
 
         val request = Request.Builder()
             .url(provider.websocketEndpoint())
-            .addHeader("Authorization", "Bearer ${provider.apiKey}")
+            .apply { provider.authHeader().let { (name, value) -> addHeader(name, value) } }
             .build()
 
         webSocket = httpClient.newWebSocket(request, object : WebSocketListener() {
@@ -295,6 +295,20 @@ private fun ASRProviderSetting.OpenAIRealtime.websocketEndpoint(): String {
     if (endpoint.contains("model=")) return endpoint
     val separator = if (endpoint.contains("?")) "&" else "?"
     return "${endpoint.trimEnd('/')}${separator}intent=transcription"
+}
+
+private val AZURE_OPENAI_HOST_SUFFIXES = listOf(
+    ".openai.azure.com",
+    ".cognitiveservices.azure.com",
+    ".services.ai.azure.com",
+)
+
+// Azure answers a Bearer API key on the realtime websocket with a 302 to an ?api-key= URL,
+// which OkHttp websockets don't follow, so Azure hosts get the api-key header instead.
+internal fun ASRProviderSetting.OpenAIRealtime.authHeader(): Pair<String, String> {
+    val host = runCatching { java.net.URI(websocketUrl.trim()).host }.getOrNull()?.lowercase()
+    val isAzure = host != null && AZURE_OPENAI_HOST_SUFFIXES.any { host.endsWith(it) }
+    return if (isAzure) "api-key" to apiKey else "Authorization" to "Bearer $apiKey"
 }
 
 private fun ASRProviderSetting.OpenAIRealtime.sessionUpdateEvent(): JSONObject {
