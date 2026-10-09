@@ -54,6 +54,7 @@
   <uses-permission android:name="android.permission.READ_CALL_LOG" />
   <uses-permission android:name="android.permission.READ_SMS" />
   <uses-permission android:name="android.permission.RECORD_AUDIO" />
+  <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
   <!-- Required so list_files / find_files / read_file can enumerate and read
        files the app didn't create itself. Without this, scoped storage on
        Android 11+ hides every pre-existing file from File.listFiles(), even

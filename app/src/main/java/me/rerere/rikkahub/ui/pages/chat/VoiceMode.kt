@@ -8,6 +8,8 @@ import android.media.AudioManager
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.lifecycle.Lifecycle
@@ -22,6 +24,7 @@ import me.rerere.asr.ASRProviderSetting
 import me.rerere.asr.providers.DashScopeASRController
 import me.rerere.asr.providers.VolcengineASRController
 import me.rerere.asr.providers.OpenAIRealtimeASRController
+import me.rerere.rikkahub.audio.VoiceAudioRouteController
 import me.rerere.rikkahub.data.datastore.Settings
 import me.rerere.rikkahub.data.datastore.getCurrentChatModel
 import me.rerere.rikkahub.data.datastore.getSelectedASRProvider
@@ -42,6 +45,7 @@ import org.koin.compose.koinInject
 @Composable
 fun rememberVoiceModeStarter(vm: ChatVM, settings: Settings): () -> Unit {
     val context = LocalContext.current.applicationContext
+    val audioRoute = remember(context) { VoiceAudioRouteController(context) }
     val client = koinInject<OkHttpClient>()
     val asr = LocalASRState.current
     val tts = LocalTTSState.current
@@ -53,15 +57,22 @@ fun rememberVoiceModeStarter(vm: ChatVM, settings: Settings): () -> Unit {
     val provider = settings.getSelectedASRProvider()
     val lifecycleOwner = LocalLifecycleOwner.current
 
-    DisposableEffect(voice, lifecycleOwner, provider, settings.getSelectedTTSProvider()) {
+    DisposableEffect(voice, lifecycleOwner, provider, settings.getSelectedTTSProvider(), audioRoute) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_STOP) voice.stop()
+            if (event == Lifecycle.Event.ON_STOP) {
+                voice.stop()
+                audioRoute.release()
+            }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
             voice.stop()
+            audioRoute.release()
         }
+    }
+    LaunchedEffect(state.phase, audioRoute) {
+        if (state.phase == VoicePhase.Off || state.phase == VoicePhase.Error) audioRoute.release()
     }
 
     val start: () -> Unit = {
@@ -80,7 +91,9 @@ fun rememberVoiceModeStarter(vm: ChatVM, settings: Settings): () -> Unit {
         when {
             blocked != null -> toaster.show(message = blocked)
             !permission.allRequiredPermissionsGranted -> permission.requestPermissions()
-            else -> voice.start(
+            else -> audioRoute.acquireBluetoothCommunicationRoute().fold(
+                onSuccess = {
+                    voice.start(
                 createAsr = { createVoiceAsr(context, client, checkNotNull(provider)) },
                 speak = if (tts.isAvailable.value) {
                     { reply ->
@@ -103,7 +116,13 @@ fun rememberVoiceModeStarter(vm: ChatVM, settings: Settings): () -> Unit {
                         }
                     }
                 } else null,
-                stopSpeaking = tts::stop,
+                        stopSpeaking = tts::stop,
+                    )
+                },
+                onFailure = { error ->
+                    audioRoute.release()
+                    toaster.show(message = error.message ?: "Unable to select Bluetooth voice audio")
+                },
             )
         }
     }
