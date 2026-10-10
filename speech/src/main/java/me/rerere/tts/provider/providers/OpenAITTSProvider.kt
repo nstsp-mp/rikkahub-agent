@@ -5,6 +5,7 @@ import android.util.Log
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.serialization.json.Json
+import me.rerere.speech.openAICompatibleAuthHeader
 import me.rerere.tts.model.AudioChunk
 import me.rerere.tts.model.AudioFormat
 import me.rerere.tts.model.TTSRequest
@@ -41,7 +42,7 @@ class OpenAITTSProvider : TTSProvider<TTSProviderSetting.OpenAI> {
 
         val httpRequest = Request.Builder()
             .url("${providerSetting.baseUrl}/audio/speech")
-            .addHeader("Authorization", "Bearer ${providerSetting.apiKey}")
+            .apply { openAICompatibleAuthHeader(providerSetting.baseUrl, providerSetting.apiKey).let { (name, value) -> addHeader(name, value) } }
             .addHeader("Content-Type", "application/json")
             .post(requestBody.toString().toRequestBody("application/json".toMediaType()))
             .build()

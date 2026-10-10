@@ -75,7 +75,7 @@ private fun OpenAIRealtimeASRConfiguration(
         label = { Text(stringResource(R.string.setting_asr_configure_api_key)) },
         description = { Text(stringResource(R.string.setting_asr_configure_openai_api_key_desc)) }
     ) {
-        OutlinedTextField(
+        ApiKeyTextField(
             value = setting.apiKey,
             onValueChange = { onValueChange(setting.copy(apiKey = it)) },
             modifier = Modifier.fillMaxWidth(),
@@ -190,7 +190,7 @@ private fun DashScopeASRConfiguration(
         label = { Text(stringResource(R.string.setting_asr_configure_api_key)) },
         description = { Text(stringResource(R.string.setting_asr_configure_dashscope_api_key_desc)) }
     ) {
-        OutlinedTextField(
+        ApiKeyTextField(
             value = setting.apiKey,
             onValueChange = { onValueChange(setting.copy(apiKey = it)) },
             modifier = Modifier.fillMaxWidth(),
@@ -276,7 +276,7 @@ private fun VolcengineASRConfiguration(
         label = { Text(stringResource(R.string.setting_asr_configure_api_key)) },
         description = { Text(stringResource(R.string.setting_asr_configure_volcengine_api_key_desc)) }
     ) {
-        OutlinedTextField(
+        ApiKeyTextField(
             value = setting.apiKey,
             onValueChange = { onValueChange(setting.copy(apiKey = it)) },
             modifier = Modifier.fillMaxWidth(),
@@ -344,7 +344,7 @@ private fun MiMoASRConfiguration(
         label = { Text(stringResource(R.string.setting_asr_configure_api_key)) },
         description = { Text(stringResource(R.string.setting_asr_configure_mimo_api_key_desc)) }
     ) {
-        OutlinedTextField(
+        ApiKeyTextField(
             value = setting.apiKey,
             onValueChange = { onValueChange(setting.copy(apiKey = it)) },
             modifier = Modifier.fillMaxWidth(),
@@ -430,7 +430,7 @@ private fun StepASRConfiguration(
         label = { Text(stringResource(R.string.setting_asr_configure_api_key)) },
         description = { Text(stringResource(R.string.setting_asr_configure_step_api_key_desc)) }
     ) {
-        OutlinedTextField(
+        ApiKeyTextField(
             value = setting.apiKey,
             onValueChange = { onValueChange(setting.copy(apiKey = it)) },
             modifier = Modifier.fillMaxWidth(),

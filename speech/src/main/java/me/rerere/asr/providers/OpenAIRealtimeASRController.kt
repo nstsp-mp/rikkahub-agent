@@ -28,6 +28,7 @@ import me.rerere.asr.ASRState
 import me.rerere.asr.ASRStatus
 import me.rerere.asr.appendAmplitude
 import me.rerere.asr.calculateRmsAmplitude
+import me.rerere.speech.openAICompatibleAuthHeader
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
@@ -80,7 +81,7 @@ class OpenAIRealtimeASRController(
 
         val request = Request.Builder()
             .url(provider.websocketEndpoint())
-            .addHeader("Authorization", "Bearer ${provider.apiKey}")
+            .apply { provider.authHeader().let { (name, value) -> addHeader(name, value) } }
             .build()
 
         webSocket = httpClient.newWebSocket(request, object : WebSocketListener() {
@@ -296,6 +297,9 @@ private fun ASRProviderSetting.OpenAIRealtime.websocketEndpoint(): String {
     val separator = if (endpoint.contains("?")) "&" else "?"
     return "${endpoint.trimEnd('/')}${separator}intent=transcription"
 }
+
+internal fun ASRProviderSetting.OpenAIRealtime.authHeader(): Pair<String, String> =
+    openAICompatibleAuthHeader(websocketUrl, apiKey)
 
 private fun ASRProviderSetting.OpenAIRealtime.sessionUpdateEvent(): JSONObject {
     val transcription = JSONObject()
