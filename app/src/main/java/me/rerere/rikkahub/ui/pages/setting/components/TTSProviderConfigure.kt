@@ -174,7 +174,7 @@ private fun OpenAITTSConfiguration(
         label = { Text(stringResource(R.string.setting_tts_page_api_key)) },
         description = { Text(stringResource(R.string.setting_tts_page_api_key_description)) }
     ) {
-        OutlinedTextField(
+        ApiKeyTextField(
             value = setting.apiKey,
             onValueChange = { newApiKey ->
                 onValueChange(setting.copy(apiKey = newApiKey))
@@ -246,7 +246,7 @@ private fun MiMoTTSConfiguration(
         label = { Text(stringResource(R.string.setting_tts_page_api_key)) },
         description = { Text(stringResource(R.string.setting_tts_page_api_key_description)) }
     ) {
-        OutlinedTextField(
+        ApiKeyTextField(
             value = setting.apiKey,
             onValueChange = { newApiKey ->
                 onValueChange(setting.copy(apiKey = newApiKey))
@@ -328,7 +328,7 @@ private fun MiniMaxTTSConfiguration(
         label = { Text(stringResource(R.string.setting_tts_page_api_key)) },
         description = { Text(stringResource(R.string.setting_tts_page_api_key_description)) }
     ) {
-        OutlinedTextField(
+        ApiKeyTextField(
             value = setting.apiKey,
             onValueChange = { newApiKey ->
                 onValueChange(setting.copy(apiKey = newApiKey))
@@ -427,7 +427,7 @@ private fun GeminiTTSConfiguration(
         label = { Text(stringResource(R.string.setting_tts_page_api_key)) },
         description = { Text(stringResource(R.string.setting_tts_page_api_key_description)) }
     ) {
-        OutlinedTextField(
+        ApiKeyTextField(
             value = setting.apiKey,
             onValueChange = { newApiKey ->
                 onValueChange(setting.copy(apiKey = newApiKey))
@@ -533,7 +533,7 @@ private fun QwenTTSConfiguration(
         label = { Text(stringResource(R.string.setting_tts_page_api_key)) },
         description = { Text(stringResource(R.string.setting_tts_page_api_key_description)) }
     ) {
-        OutlinedTextField(
+        ApiKeyTextField(
             value = setting.apiKey,
             onValueChange = { newApiKey ->
                 onValueChange(setting.copy(apiKey = newApiKey))
@@ -664,7 +664,7 @@ private fun GroqTTSConfiguration(
         label = { Text(stringResource(R.string.setting_tts_page_api_key)) },
         description = { Text(stringResource(R.string.setting_tts_page_api_key_description)) }
     ) {
-        OutlinedTextField(
+        ApiKeyTextField(
             value = setting.apiKey,
             onValueChange = { newApiKey ->
                 onValueChange(setting.copy(apiKey = newApiKey))
@@ -735,7 +735,7 @@ private fun XAITTSConfiguration(
         label = { Text(stringResource(R.string.setting_tts_page_api_key)) },
         description = { Text(stringResource(R.string.setting_tts_page_api_key_description)) }
     ) {
-        OutlinedTextField(
+        ApiKeyTextField(
             value = setting.apiKey,
             onValueChange = { newApiKey ->
                 onValueChange(setting.copy(apiKey = newApiKey))
@@ -838,7 +838,7 @@ private fun ElevenLabsTTSConfiguration(
         label = { Text(stringResource(R.string.setting_tts_page_api_key)) },
         description = { Text(stringResource(R.string.setting_tts_page_api_key_description)) }
     ) {
-        OutlinedTextField(
+        ApiKeyTextField(
             value = setting.apiKey,
             onValueChange = { newApiKey ->
                 onValueChange(setting.copy(apiKey = newApiKey))
@@ -944,7 +944,7 @@ private fun FishAudioTTSConfiguration(
         label = { Text(stringResource(R.string.setting_tts_page_api_key)) },
         description = { Text(stringResource(R.string.setting_tts_page_api_key_description)) }
     ) {
-        OutlinedTextField(
+        ApiKeyTextField(
             value = setting.apiKey,
             onValueChange = { newApiKey ->
                 onValueChange(setting.copy(apiKey = newApiKey))
@@ -1051,7 +1051,7 @@ private fun StepTTSConfiguration(
         label = { Text(stringResource(R.string.setting_tts_page_api_key)) },
         description = { Text("从阶跃星辰官网获取密钥: platform.stepfun.com/interface-key") }
     ) {
-        OutlinedTextField(
+        ApiKeyTextField(
             value = setting.apiKey,
             onValueChange = { newApiKey ->
                 onValueChange(setting.copy(apiKey = newApiKey))

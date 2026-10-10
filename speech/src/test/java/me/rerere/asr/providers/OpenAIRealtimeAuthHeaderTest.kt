@@ -1,6 +1,7 @@
 package me.rerere.asr.providers
 
 import me.rerere.asr.ASRProviderSetting
+import me.rerere.speech.openAICompatibleAuthHeader
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -19,6 +20,17 @@ class OpenAIRealtimeAuthHeaderTest {
             val provider = ASRProviderSetting.OpenAIRealtime(apiKey = "azure-key", websocketUrl = url)
             assertEquals(url, "api-key" to "azure-key", provider.authHeader())
         }
+    }
+
+    @Test fun `azure tts base url uses api-key header`() {
+        assertEquals(
+            "api-key" to "k",
+            openAICompatibleAuthHeader("https://rikka-voice-eus-resource.openai.azure.com/openai/v1", "k"),
+        )
+        assertEquals(
+            "Authorization" to "Bearer k",
+            openAICompatibleAuthHeader("https://api.openai.com/v1", "k"),
+        )
     }
 
     @Test fun `lookalike and malformed hosts keep bearer authorization`() {

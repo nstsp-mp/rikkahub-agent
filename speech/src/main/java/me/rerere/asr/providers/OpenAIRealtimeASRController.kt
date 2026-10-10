@@ -28,6 +28,7 @@ import me.rerere.asr.ASRState
 import me.rerere.asr.ASRStatus
 import me.rerere.asr.appendAmplitude
 import me.rerere.asr.calculateRmsAmplitude
+import me.rerere.speech.openAICompatibleAuthHeader
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
@@ -297,19 +298,8 @@ private fun ASRProviderSetting.OpenAIRealtime.websocketEndpoint(): String {
     return "${endpoint.trimEnd('/')}${separator}intent=transcription"
 }
 
-private val AZURE_OPENAI_HOST_SUFFIXES = listOf(
-    ".openai.azure.com",
-    ".cognitiveservices.azure.com",
-    ".services.ai.azure.com",
-)
-
-// Azure answers a Bearer API key on the realtime websocket with a 302 to an ?api-key= URL,
-// which OkHttp websockets don't follow, so Azure hosts get the api-key header instead.
-internal fun ASRProviderSetting.OpenAIRealtime.authHeader(): Pair<String, String> {
-    val host = runCatching { java.net.URI(websocketUrl.trim()).host }.getOrNull()?.lowercase()
-    val isAzure = host != null && AZURE_OPENAI_HOST_SUFFIXES.any { host.endsWith(it) }
-    return if (isAzure) "api-key" to apiKey else "Authorization" to "Bearer $apiKey"
-}
+internal fun ASRProviderSetting.OpenAIRealtime.authHeader(): Pair<String, String> =
+    openAICompatibleAuthHeader(websocketUrl, apiKey)
 
 private fun ASRProviderSetting.OpenAIRealtime.sessionUpdateEvent(): JSONObject {
     val transcription = JSONObject()
