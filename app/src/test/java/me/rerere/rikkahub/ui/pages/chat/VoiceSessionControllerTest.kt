@@ -62,7 +62,6 @@ class VoiceSessionControllerTest {
         fun start() = voice.start(
             { FakeAsr().also { asrs.add(it) } },
             {
-                assertTrue(asrs.all { asr -> asr.disposed })
                 spoken.add(it)
                 if (failPlayback) error("playback failed")
                 playback.await()
@@ -177,13 +176,14 @@ class VoiceSessionControllerTest {
             assertTrue(rig.spoken.isEmpty())
             rig.replies[0].complete("reply one")
             awaitCondition { rig.spoken.size == 1 }
-            assertTrue(idle.disposed)
+            assertFalse(idle.disposed) // The recognition connection stays open during playback.
             assertEquals(listOf("reply one"), rig.spoken)
             assertEquals(VoicePhase.Speaking, rig.voice.state.value.phase)
             rig.playback.complete(Unit)
             awaitCondition { rig.spoken.size == 2 }
             assertEquals(listOf("reply one", "reply two"), rig.spoken)
-            rig.recorder(idle)
+            awaitCondition { rig.voice.state.value.phase == VoicePhase.Listening }
+            assertFalse(idle.disposed)
         } finally { rig.close() }
     }
 
@@ -297,7 +297,7 @@ class VoiceSessionControllerTest {
             val idle = rig.recorder(second)
             rig.replies[0].complete("reply one")
             awaitCondition { rig.spoken.size == 1 }
-            val listener = rig.recorder(idle)
+            val listener = idle
             assertEquals(VoicePhase.Speaking, rig.voice.state.value.phase)
             listener.end("Stop.")
             awaitCondition { rig.stopCount == 2 }
@@ -319,12 +319,13 @@ class VoiceSessionControllerTest {
             val idle = rig.recorder(asr)
             rig.replies.single().complete("reply")
             awaitCondition { rig.spoken.size == 1 }
-            val listener = rig.recorder(idle)
+            val listener = idle
             listener.end("reply echoed by the speaker")
             val next = rig.recorder(listener)
             assertEquals(VoicePhase.Speaking, rig.voice.state.value.phase)
             rig.playback.complete(Unit)
-            awaitCondition { next.disposed && rig.voice.state.value.phase == VoicePhase.Listening }
+            awaitCondition { rig.voice.state.value.phase == VoicePhase.Listening }
+            assertFalse(next.disposed)
             assertEquals(1, rig.replies.size)
             assertEquals(1, rig.stopCount)
         } finally { rig.close() }
@@ -339,7 +340,7 @@ class VoiceSessionControllerTest {
             val idle = rig.recorder(asr)
             rig.replies.single().complete("reply")
             awaitCondition { rig.spoken.size == 1 }
-            rig.recorder(idle).end("Goodbye.")
+            idle.end("Goodbye.")
             awaitCondition { rig.voice.state.value.phase == VoicePhase.Off && rig.stopCount == 2 }
             assertTrue(rig.asrs.all { it.disposed })
         } finally { rig.close() }

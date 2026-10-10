@@ -2497,7 +2497,7 @@
   <string name="chat_page_voice_listening_queued">Listening; new speech will be queued</string>
   <string name="chat_page_voice_listening">Listening; your message will be sent when you finish speaking</string>
   <string name="chat_page_voice_transcribing">Finalizing transcription…</string>
-  <string name="chat_page_voice_speaking">Reading aloud; listening will resume afterward</string>
+  <string name="chat_page_voice_speaking">Reading aloud; say \"stop\" to interrupt</string>
   <string name="chat_page_voice_paused">Paused</string>
   <string name="chat_page_voice_retry">Retry</string>
   <string name="chat_page_voice_end">End</string>

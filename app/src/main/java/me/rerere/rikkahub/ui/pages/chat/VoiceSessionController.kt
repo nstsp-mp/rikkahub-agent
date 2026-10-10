@@ -6,7 +6,6 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.TimeoutCancellationException
-import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
@@ -57,7 +56,7 @@ fun parseVoiceCommand(text: String): VoiceCommand? {
     }
 }
 
-/** Capture and generation run independently. Only TTS owns an exclusive microphone pause. */
+/** Capture, generation and playback run independently; speech heard during playback only counts as a command. */
 class VoiceSessionController(
     private val scope: CoroutineScope,
     private val getString: (Int) -> String,
@@ -72,10 +71,11 @@ class VoiceSessionController(
     private var job: Job? = null
 
     private sealed interface Event {
-        data class Utterance(val text: String) : Event
+        data class Utterance(val text: String, val duringPlayback: Boolean) : Event
         data class Reply(val text: String?) : Event
         data class Failed(val error: Exception) : Event
         data class CaptureFailed(val error: Exception) : Event
+        data object PlaybackDone : Event
     }
 
     fun start(
@@ -119,6 +119,8 @@ class VoiceSessionController(
         var asr: ASRController? = null
         var capture: Job? = null
         var captureFailures = 0
+        var playback: Job? = null
+        var playing = false
         // Replies arrive in submission order; those up to mutedThrough were cancelled by voice and are not spoken.
         var submittedCount = 0
         var repliedCount = 0
@@ -136,34 +138,33 @@ class VoiceSessionController(
 
         try {
             while (isActive) {
-                // Finish any sentence already in progress before giving TTS the microphone pause.
-                if (speak != null && replies.isNotEmpty() && asr?.state?.value?.voiceTurn?.itemId == null) {
-                    capture?.cancelAndJoin()
-                    capture = null
-                    asr = null
+                // Finish any sentence already in progress before starting playback. The recognition
+                // connection stays open while a reply plays, so "stop" is heard without a reconnect.
+                if (speak != null && playback == null && replies.isNotEmpty() &&
+                    asr?.state?.value?.voiceTurn?.itemId == null
+                ) {
+                    val text = replies.removeFirst()
+                    playing = true
                     mutableState.update { it.copy(phase = VoicePhase.Speaking) }
-                    when (speakListeningForCommands(replies.removeFirst(), createAsr, speak)) {
-                        VoiceCommand.EndSession -> {
-                            stop()
-                            break
+                    playback = launch {
+                        try {
+                            speak(text)
+                            delay(300) // Speech starting in the loudspeaker's tail is treated as echo too.
+                            events.send(Event.PlaybackDone)
+                        } catch (e: Exception) {
+                            if (e is CancellationException && !isActive) throw e
+                            events.send(Event.Failed(e))
                         }
-                        VoiceCommand.CancelReplies -> {
-                            stopSpeaking()
-                            replies.clear()
-                            mutedThrough = submittedCount
-                        }
-                        null -> {}
                     }
-                    delay(300) // Let the loudspeaker's tail decay before opening the microphone.
                     continue
                 }
                 if (capture == null) {
-                    mutableState.update { it.copy(phase = VoicePhase.Connecting, transcript = "") }
+                    if (!playing) mutableState.update { it.copy(phase = VoicePhase.Connecting, transcript = "") }
                     val recorder = createAsr()
                     asr = recorder
                     capture = launch(start = CoroutineStart.UNDISPATCHED) {
                         try {
-                            events.send(Event.Utterance(listen(recorder)))
+                            events.send(listen(recorder) { playing })
                         } catch (e: Exception) {
                             if (e is CancellationException && !isActive) throw e
                             events.send(Event.CaptureFailed(e))
@@ -176,17 +177,26 @@ class VoiceSessionController(
                         capture = null
                         asr = null
                         captureFailures = 0
-                        when (parseVoiceCommand(event.text)) {
-                            VoiceCommand.EndSession -> {
+                        val command = parseVoiceCommand(event.text)
+                        when {
+                            command == VoiceCommand.EndSession -> {
                                 stop()
                                 break
                             }
-                            VoiceCommand.CancelReplies -> {
+                            command == VoiceCommand.CancelReplies -> {
+                                playback?.let {
+                                    it.cancel()
+                                    stopSpeaking()
+                                }
+                                playback = null
+                                playing = false
                                 replies.clear()
                                 mutedThrough = submittedCount
-                                mutableState.update { it.copy(transcript = event.text) }
+                                mutableState.update { it.copy(phase = VoicePhase.Connecting, transcript = event.text) }
                             }
-                            null -> if (event.text.isNotBlank()) {
+                            // Speech heard over a reply may be the reply itself, so only commands count.
+                            event.duringPlayback -> {}
+                            event.text.isNotBlank() -> {
                                 val reply = enqueueMessage(event.text)
                                 submittedCount++
                                 mutableState.update { it.copy(transcript = event.text, pendingReplies = it.pendingReplies + 1) }
@@ -200,13 +210,19 @@ class VoiceSessionController(
                         event.text?.takeIf { speak != null && it.isNotBlank() && repliedCount > mutedThrough }
                             ?.let { replies.addLast(it) }
                     }
+                    is Event.PlaybackDone -> {
+                        playback = null
+                        playing = false
+                        val listening = asr?.state?.value?.status == ASRStatus.Listening
+                        mutableState.update { it.copy(phase = if (listening) VoicePhase.Listening else VoicePhase.Connecting) }
+                    }
                     is Event.CaptureFailed -> {
                         capture?.join()
                         capture = null
                         asr = null
                         // Dropped sockets, network changes and expired sessions get a quiet reconnect.
                         if (captureFailures >= reconnectDelaysMs.size) throw event.error
-                        mutableState.update { it.copy(phase = VoicePhase.Connecting) }
+                        if (!playing) mutableState.update { it.copy(phase = VoicePhase.Connecting) }
                         delay(reconnectDelaysMs[captureFailures++])
                     }
                     is Event.Failed -> throw event.error
@@ -219,35 +235,9 @@ class VoiceSessionController(
         }
     }
 
-    /**
-     * Plays a reply while listening only for voice commands, so "stop" works mid-sentence. Other speech
-     * during playback is discarded: it may be the reply's own audio picked up by the microphone.
-     * Returns the command that interrupted playback, or null when playback finished.
-     */
-    private suspend fun speakListeningForCommands(
-        text: String,
-        createAsr: () -> ASRController,
-        speak: suspend (String) -> Unit,
-    ): VoiceCommand? = coroutineScope {
-        var heard: VoiceCommand? = null
-        val playback = launch { speak(text) }
-        val listener = launch {
-            try {
-                while (heard == null) {
-                    heard = parseVoiceCommand(listen(createAsr(), showProgress = false))
-                }
-                playback.cancel()
-            } catch (e: Exception) {
-                if (e is CancellationException && !isActive) throw e
-                // Command listening is best effort; a failure here must not interrupt the reply.
-            }
-        }
-        playback.join()
-        listener.cancelAndJoin()
-        heard
-    }
-
-    private suspend fun listen(asr: ASRController, showProgress: Boolean = true): String {
+    /** Returns the next utterance, noting whether it began while a reply was playing. */
+    private suspend fun listen(asr: ASRController, playing: () -> Boolean): Event.Utterance {
+        var startedDuringPlayback = false
         try {
             asr.start {}
             withTimeout(15_000) {
@@ -260,20 +250,22 @@ class VoiceSessionController(
                 asr.state.onEach {
                     check(it.errorMessage == null) { it.errorMessage.orEmpty() }
                     check(it.status == ASRStatus.Listening || it.voiceTurn.isComplete) { "Speech recognition disconnected" }
-                    if (showProgress) {
+                    if (it.voiceTurn.itemId == null) startedDuringPlayback = false
+                    else if (playing()) startedDuringPlayback = true
+                    if (!playing()) {
                         mutableState.update { current -> current.copy(phase = VoicePhase.Listening, transcript = it.transcript) }
                     }
                 }.first { it.voiceTurn.speechEnded }
             }
             if (ended == null) {
                 check(asr.state.value.voiceTurn.itemId == null) { "Speech recognition timed out" }
-                return "" // Nothing was said; the caller opens a fresh connection.
+                return Event.Utterance("", false) // Nothing was said; the caller opens a fresh connection.
             }
             asr.pauseCapture()
-            if (showProgress) {
+            if (!playing()) {
                 mutableState.update { it.copy(phase = VoicePhase.Transcribing, transcript = ended.transcript) }
             }
-            return withTimeout(15_000) {
+            val text = withTimeout(15_000) {
                 asr.state.first {
                     check(it.errorMessage == null) { it.errorMessage.orEmpty() }
                     check(it.voiceTurn.isComplete || it.status == ASRStatus.Listening) {
@@ -282,6 +274,7 @@ class VoiceSessionController(
                     it.voiceTurn.isComplete
                 }.voiceTurn.finalText.orEmpty()
             }
+            return Event.Utterance(text, startedDuringPlayback)
         } finally {
             asr.dispose()
         }
