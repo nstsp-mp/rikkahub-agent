@@ -18,6 +18,7 @@ import me.rerere.rikkahub.data.mail.GraphMailClient
 import me.rerere.rikkahub.data.mail.MailAccount
 import me.rerere.rikkahub.data.mail.MailAuthManager
 import me.rerere.rikkahub.data.mail.MailMessage
+import me.rerere.rikkahub.data.mail.MailTracker
 import me.rerere.rikkahub.data.mail.putMessage
 import java.time.Duration
 import java.time.Instant
@@ -202,6 +203,93 @@ fun mailCheckReplyTool(auth: MailAuthManager, client: GraphMailClient): Tool = T
                     put("replied", replies.isNotEmpty())
                     put("replies", replies.toJsonArray())
                 }
+            }
+        }
+    }
+)
+
+fun mailNeedingReplyTool(tracker: MailTracker): Tool = Tool(
+    name = "mail_needing_reply",
+    description = """
+        List emails the reply tracker is waiting on the user to answer, oldest due date first, with sender,
+        subject, why it needs a reply, received and due times (UTC), and whether it is overdue. Tracking is
+        automatic when reply tracking is on in Settings → Mail.
+    """.trimIndent().replace("\n", " "),
+    parameters = { InputSchema.Obj(properties = buildJsonObject {}) },
+    execute = {
+        val now = System.currentTimeMillis()
+        val items = tracker.awaiting()
+        val status = tracker.status.value
+        val payload = buildJsonObject {
+            put("tracking_enabled", status.enabled)
+            if (status.lastRunAt > 0) put("last_checked", Instant.ofEpochMilli(status.lastRunAt).toString())
+            put("count", items.size)
+            put("items", buildJsonArray {
+                items.forEach { item ->
+                    addJsonObject {
+                        put("id", item.messageId)
+                        put("from", if (item.fromName.isBlank()) item.fromAddress else "${item.fromName} <${item.fromAddress}>")
+                        put("subject", item.subject)
+                        if (item.reason.isNotBlank()) put("why", item.reason)
+                        put("received", Instant.ofEpochMilli(item.receivedAt).toString())
+                        put("due", Instant.ofEpochMilli(item.dueAt).toString())
+                        put("overdue", item.dueAt <= now)
+                    }
+                }
+            })
+        }
+        listOf(UIMessagePart.Text(payload.toString()))
+    }
+)
+
+fun mailMarkHandledTool(tracker: MailTracker): Tool = Tool(
+    name = "mail_mark_handled",
+    description = "Stop tracking an email as needing a reply (for example it was handled another way). Marks its Outlook flag complete.",
+    parameters = {
+        InputSchema.Obj(
+            properties = buildJsonObject { put("id", stringProp("Message id from mail_needing_reply")) },
+            required = listOf("id"),
+        )
+    },
+    execute = { input ->
+        val id = input.str("id") ?: error("id is required")
+        val entity = tracker.markHandled(id)
+        val payload = buildJsonObject {
+            if (entity == null) {
+                put("error", "not_tracked")
+                put("detail", "That message is not being tracked.")
+            } else {
+                put("ok", true)
+                put("subject", entity.subject)
+            }
+        }
+        listOf(UIMessagePart.Text(payload.toString()))
+    }
+)
+
+fun mailTrackTool(auth: MailAuthManager, tracker: MailTracker): Tool = Tool(
+    name = "mail_track",
+    description = """
+        Start tracking an email as needing the user's reply, when they ask to be reminded about it. It gets an
+        Outlook follow-up flag due in two business days and a reminder if it is still unanswered by then.
+    """.trimIndent().replace("\n", " "),
+    parameters = {
+        InputSchema.Obj(
+            properties = buildJsonObject {
+                put("id", stringProp("Message id from mail_list or mail_search"))
+                put("reason", stringProp("Short note on what reply is needed"))
+                put("account", ACCOUNT_PROP)
+            },
+            required = listOf("id"),
+        )
+    },
+    execute = { input ->
+        withMailbox(auth, input) { account ->
+            val entity = tracker.track(account, input.str("id") ?: error("id is required"), input.str("reason") ?: "Tracked on request")
+            buildJsonObject {
+                put("ok", true)
+                put("subject", entity.subject)
+                put("due", Instant.ofEpochMilli(entity.dueAt).toString())
             }
         }
     }

@@ -20,6 +20,7 @@ import me.rerere.rikkahub.data.db.dao.ScheduledJobDao
 import me.rerere.rikkahub.data.db.dao.ScheduledJobRunDao
 import me.rerere.rikkahub.data.db.dao.SshHostDao
 import me.rerere.rikkahub.data.db.dao.TelegramChatDao
+import me.rerere.rikkahub.data.db.dao.TrackedMailDao
 import me.rerere.rikkahub.data.db.dao.WorkspaceDAO
 import me.rerere.rikkahub.data.db.entity.ConversationEntity
 import me.rerere.rikkahub.data.db.entity.ConversationCompactionEntity
@@ -33,6 +34,7 @@ import me.rerere.rikkahub.data.db.entity.ScheduledJobEntity
 import me.rerere.rikkahub.data.db.entity.ScheduledJobRunEntity
 import me.rerere.rikkahub.data.db.entity.SshHostEntity
 import me.rerere.rikkahub.data.db.entity.TelegramChatEntity
+import me.rerere.rikkahub.data.db.entity.TrackedMailEntity
 import me.rerere.rikkahub.data.db.entity.WorkspaceEntity
 import me.rerere.rikkahub.data.db.migrations.Migration_16_17
 import me.rerere.rikkahub.data.db.migrations.Migration_20_21
@@ -63,8 +65,9 @@ import me.rerere.rikkahub.workflow.db.WorkflowRunEntity
         AgentRun::class,
         WorkspaceEntity::class,
         FolderEntity::class,
+        TrackedMailEntity::class,
     ],
-    version = 31,
+    version = 32,
     autoMigrations = [
         AutoMigration(from = 1, to = 2),
         AutoMigration(from = 2, to = 3),
@@ -113,6 +116,9 @@ import me.rerere.rikkahub.workflow.db.WorkflowRunEntity
         // AppDatabaseFactory) instead of a plain auto-migration: a database restored from an
         // upstream 2.5.x backup can already carry this column, and an unconditional ADD COLUMN
         // crash-loops the app on every launch (issue #105).
+        // v32: the tracked_mail table behind the email reply tracker. A new table only, so Room
+        // creates it outright.
+        AutoMigration(from = 31, to = 32),
     ]
 )
 @TypeConverters(TokenUsageConverter::class)
@@ -148,6 +154,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun workspaceDao(): WorkspaceDAO
 
     abstract fun folderDao(): FolderDAO
+
+    abstract fun trackedMailDao(): TrackedMailDao
 }
 
 object TokenUsageConverter {

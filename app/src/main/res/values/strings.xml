@@ -883,6 +883,15 @@
   <string name="setting_mail_page_sign_in">Sign in with Microsoft</string>
   <string name="setting_mail_page_waiting">Waiting for sign-in…</string>
   <string name="setting_mail_page_sign_out">Sign out</string>
+  <string name="setting_mail_page_track_title">Track replies</string>
+  <string name="setting_mail_page_track_desc">Every 15 minutes, new inbox mail is checked by your fast model. Messages that need your reply get an Outlook flag due in two business days, clear when you reply, and send a reminder if they go overdue.</string>
+  <string name="setting_mail_page_never_checked">Not checked yet</string>
+  <string name="setting_mail_page_last_checked">Checked %1$s · %2$s</string>
+  <string name="setting_mail_page_check_now">Check now</string>
+  <string name="setting_mail_page_awaiting">Waiting for your reply (%1$d)</string>
+  <string name="setting_mail_page_due">due %1$s</string>
+  <string name="setting_mail_page_overdue">overdue since %1$s</string>
+  <string name="setting_mail_page_mark_handled">Handled</string>
   <string name="setting_mail_page_tools_hint">To use mail in a chat, turn on the Mail tool for the assistant under Assistant → Local tools.</string>
   <string name="setting_page_message_display_settings">Message Display</string>
   <string name="setting_page_model_and_services">Models &amp; Services</string>

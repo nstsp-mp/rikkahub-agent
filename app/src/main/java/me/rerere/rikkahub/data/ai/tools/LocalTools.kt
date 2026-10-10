@@ -47,6 +47,9 @@ import me.rerere.rikkahub.data.ai.tools.local.listSensorsTool
 import me.rerere.rikkahub.data.ai.tools.local.listSmsInboxTool
 import me.rerere.rikkahub.data.ai.tools.local.mailCheckReplyTool
 import me.rerere.rikkahub.data.ai.tools.local.mailListTool
+import me.rerere.rikkahub.data.ai.tools.local.mailMarkHandledTool
+import me.rerere.rikkahub.data.ai.tools.local.mailNeedingReplyTool
+import me.rerere.rikkahub.data.ai.tools.local.mailTrackTool
 import me.rerere.rikkahub.data.ai.tools.local.mailReadTool
 import me.rerere.rikkahub.data.ai.tools.local.mailSearchTool
 import me.rerere.rikkahub.data.ai.tools.local.locationTool
@@ -383,6 +386,7 @@ class LocalTools(
     // Microsoft 365 mail sign-in and Graph client — back the mail_* tools.
     private val mailAuthManager: me.rerere.rikkahub.data.mail.MailAuthManager,
     private val graphMailClient: me.rerere.rikkahub.data.mail.GraphMailClient,
+    private val mailTracker: me.rerere.rikkahub.data.mail.MailTracker,
 ) {
     val javascriptTool by lazy {
         Tool(
@@ -821,6 +825,9 @@ class LocalTools(
             tools.add(mailSearchTool(mailAuthManager, graphMailClient))
             tools.add(mailReadTool(mailAuthManager, graphMailClient))
             tools.add(mailCheckReplyTool(mailAuthManager, graphMailClient))
+            tools.add(mailNeedingReplyTool(mailTracker))
+            tools.add(mailMarkHandledTool(mailTracker))
+            tools.add(mailTrackTool(mailAuthManager, mailTracker))
         }
         if (options.contains(LocalToolOption.CameraPhoto)) {
             tools.add(cameraPhotoTool(context, cameraResultBuffer))

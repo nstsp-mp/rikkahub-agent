@@ -206,6 +206,7 @@ val appModule = module {
             keyboardApiClient = get(),
             mailAuthManager = get(),
             graphMailClient = get(),
+            mailTracker = get(),
         )
     }
 
@@ -218,6 +219,16 @@ val appModule = module {
         )
     }
     single { me.rerere.rikkahub.data.mail.GraphMailClient(okHttpClient = get(), auth = get()) }
+    single {
+        me.rerere.rikkahub.data.mail.MailTracker(
+            context = get(),
+            auth = get(),
+            client = get(),
+            dao = get<me.rerere.rikkahub.data.db.AppDatabase>().trackedMailDao(),
+            settingsStore = get(),
+            providerManager = get(),
+        )
+    }
 
     single {
         UpdateChecker(

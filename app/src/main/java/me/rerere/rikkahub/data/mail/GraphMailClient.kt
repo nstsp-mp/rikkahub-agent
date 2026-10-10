@@ -27,7 +27,7 @@ import java.time.Instant
 internal const val GRAPH_BASE = "https://graph.microsoft.com/v1.0"
 
 private const val MESSAGE_FIELDS =
-    "id,conversationId,subject,from,toRecipients,receivedDateTime,sentDateTime,isRead,bodyPreview,importance,flag,webLink"
+    "id,conversationId,subject,from,toRecipients,receivedDateTime,sentDateTime,isRead,bodyPreview,importance,flag,webLink,inferenceClassification"
 
 data class MailMessage(
     val id: String,
@@ -43,6 +43,7 @@ data class MailMessage(
     val importance: String,
     val flagStatus: String,
     val webLink: String,
+    val inferenceClassification: String = "",
 )
 
 data class MailboxSettings(val workDays: Set<DayOfWeek>)
@@ -111,6 +112,14 @@ class GraphMailClient(
             .addQueryParameter("\$top", "50")
             .build()
         return get(account, url).messages().any { sent -> sent.sentAt?.isAfter(after) == true }
+    }
+
+    /** Metadata for one message, or null when it no longer exists (deleted or moved out of reach). */
+    suspend fun findMessage(account: MailAccount, id: String): MailMessage? = try {
+        get(account, graphUrl("me/messages/${id.pathSafe()}").addQueryParameter("\$select", MESSAGE_FIELDS).build())
+            .toMailMessage()
+    } catch (e: GraphApiException) {
+        if (e.status == 404) null else throw e
     }
 
     suspend fun setFlag(account: MailAccount, id: String, due: Instant?) {
@@ -200,6 +209,7 @@ internal fun JsonObject.toMailMessage(): MailMessage {
         importance = str("importance"),
         flagStatus = this["flag"]?.jsonObject?.get("flagStatus")?.jsonPrimitive?.contentOrNull.orEmpty(),
         webLink = str("webLink"),
+        inferenceClassification = str("inferenceClassification"),
     )
 }
 
