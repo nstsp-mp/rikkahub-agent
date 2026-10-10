@@ -45,6 +45,10 @@ import me.rerere.rikkahub.data.ai.tools.local.globalActionTool
 import me.rerere.rikkahub.data.ai.tools.local.listContactsTool
 import me.rerere.rikkahub.data.ai.tools.local.listSensorsTool
 import me.rerere.rikkahub.data.ai.tools.local.listSmsInboxTool
+import me.rerere.rikkahub.data.ai.tools.local.mailCheckReplyTool
+import me.rerere.rikkahub.data.ai.tools.local.mailListTool
+import me.rerere.rikkahub.data.ai.tools.local.mailReadTool
+import me.rerere.rikkahub.data.ai.tools.local.mailSearchTool
 import me.rerere.rikkahub.data.ai.tools.local.locationTool
 import me.rerere.rikkahub.data.ai.tools.local.longPressTool
 import me.rerere.rikkahub.data.ai.tools.local.mediaScannerTool
@@ -172,6 +176,7 @@ sealed class LocalToolOption {
     @Serializable @SerialName("contacts")        data object Contacts       : LocalToolOption()
     @Serializable @SerialName("call_log")        data object CallLog        : LocalToolOption()
     @Serializable @SerialName("sms_inbox")       data object SmsInbox       : LocalToolOption()
+    @Serializable @SerialName("mail")            data object Mail           : LocalToolOption()
     @Serializable @SerialName("camera_photo")    data object CameraPhoto    : LocalToolOption()
     @Serializable @SerialName("mic_recorder")    data object MicRecorder    : LocalToolOption()
     @Serializable @SerialName("speech_to_text")  data object SpeechToText   : LocalToolOption()
@@ -375,6 +380,9 @@ class LocalTools(
     private val okHttpClient: okhttp3.OkHttpClient,
     // agent-keyboard IPC client — backs the keyboard_* tools (drives the active text field).
     private val keyboardApiClient: me.rerere.rikkahub.data.keyboard.KeyboardApiClient,
+    // Microsoft 365 mail sign-in and Graph client — back the mail_* tools.
+    private val mailAuthManager: me.rerere.rikkahub.data.mail.MailAuthManager,
+    private val graphMailClient: me.rerere.rikkahub.data.mail.GraphMailClient,
 ) {
     val javascriptTool by lazy {
         Tool(
@@ -807,6 +815,12 @@ class LocalTools(
         if (options.contains(LocalToolOption.SmsInbox)) {
             tools.add(listSmsInboxTool(context))
             tools.add(searchSmsTool(context))
+        }
+        if (options.contains(LocalToolOption.Mail)) {
+            tools.add(mailListTool(mailAuthManager, graphMailClient))
+            tools.add(mailSearchTool(mailAuthManager, graphMailClient))
+            tools.add(mailReadTool(mailAuthManager, graphMailClient))
+            tools.add(mailCheckReplyTool(mailAuthManager, graphMailClient))
         }
         if (options.contains(LocalToolOption.CameraPhoto)) {
             tools.add(cameraPhotoTool(context, cameraResultBuffer))

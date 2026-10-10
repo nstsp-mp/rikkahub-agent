@@ -75,6 +75,12 @@ fun settingsSearchIndex(developerMode: Boolean): List<SettingsSearchEntry> {
             route = Screen.SettingMcp,
         ),
         SettingsSearchEntry(
+            titleRes = R.string.setting_page_mail,
+            descriptionRes = R.string.setting_page_mail_desc,
+            groupRes = R.string.setting_page_model_and_services,
+            route = Screen.SettingMail,
+        ),
+        SettingsSearchEntry(
             titleRes = R.string.setting_page_sub_agents,
             descriptionRes = R.string.setting_page_sub_agents_desc,
             groupRes = R.string.setting_page_model_and_services,

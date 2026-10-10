@@ -877,6 +877,13 @@
   <string name="setting_page_interaction_notification_settings">Interaction &amp;amp; Notifications</string>
   <string name="setting_page_mcp">MCP</string>
   <string name="setting_page_mcp_desc">Configure MCP Servers</string>
+  <string name="setting_page_mail">Mail</string>
+  <string name="setting_page_mail_desc">Sign in to Microsoft 365 mail</string>
+  <string name="setting_mail_page_intro">Sign in to a Microsoft 365 mailbox so assistants can list, search and read your email. Sign-in tokens are encrypted and stay on this device.</string>
+  <string name="setting_mail_page_sign_in">Sign in with Microsoft</string>
+  <string name="setting_mail_page_waiting">Waiting for sign-in…</string>
+  <string name="setting_mail_page_sign_out">Sign out</string>
+  <string name="setting_mail_page_tools_hint">To use mail in a chat, turn on the Mail tool for the assistant under Assistant → Local tools.</string>
   <string name="setting_page_message_display_settings">Message Display</string>
   <string name="setting_page_model_and_services">Models &amp; Services</string>
   <string name="setting_page_no_share_app">No sharing app found</string>
@@ -1323,6 +1330,8 @@
   <string name="assistant_page_local_tools_call_log_desc">Read recent calls (incoming, outgoing, missed) with duration and timestamps.</string>
   <string name="assistant_page_local_tools_sms_inbox_title">SMS inbox</string>
   <string name="assistant_page_local_tools_sms_inbox_desc">Read or search SMS inbox messages.</string>
+  <string name="assistant_page_local_tools_mail_title">Mail</string>
+  <string name="assistant_page_local_tools_mail_desc">List, search and read Microsoft 365 email, and check whether someone has replied. Sign in under Settings → Mail.</string>
   <string name="assistant_page_local_tools_camera_photo_title">Camera (photo)</string>
   <string name="assistant_page_local_tools_camera_photo_desc">Open the system camera so the user can take a photo and return its file path.</string>
   <string name="assistant_page_local_tools_mic_recorder_title">Mic recorder</string>

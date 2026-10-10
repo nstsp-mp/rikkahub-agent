@@ -45,6 +45,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import me.rerere.hugeicons.HugeIcons
 import me.rerere.hugeicons.stroke.AiMagic
 import me.rerere.hugeicons.stroke.Alert01
+import me.rerere.hugeicons.stroke.Mail01
 import me.rerere.hugeicons.stroke.Tick01
 import me.rerere.hugeicons.stroke.Book01
 import me.rerere.hugeicons.stroke.Book03
@@ -269,6 +270,12 @@ fun SettingPage(vm: SettingVM = koinViewModel()) {
                         leadingContent = { Icon(HugeIcons.McpServer, null) },
                         supportingContent = { Text(stringResource(R.string.setting_page_mcp_desc)) },
                         headlineContent = { Text(stringResource(R.string.setting_page_mcp)) },
+                    )
+                    item(
+                        onClick = { navController.navigate(Screen.SettingMail) },
+                        leadingContent = { Icon(HugeIcons.Mail01, null) },
+                        supportingContent = { Text(stringResource(R.string.setting_page_mail_desc)) },
+                        headlineContent = { Text(stringResource(R.string.setting_page_mail)) },
                     )
                     item(
                         onClick = { navController.navigate(Screen.SettingSubAgents) },

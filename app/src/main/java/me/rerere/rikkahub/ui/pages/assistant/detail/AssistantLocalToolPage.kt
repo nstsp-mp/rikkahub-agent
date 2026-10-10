@@ -618,6 +618,20 @@ private fun AssistantLocalToolContent(
             )
             item(
                 headlineContent = {
+                    Text(stringResource(R.string.assistant_page_local_tools_mail_title))
+                },
+                supportingContent = {
+                    Text(stringResource(R.string.assistant_page_local_tools_mail_desc))
+                },
+                trailingContent = {
+                    PermissionedSwitch(
+                        checked = assistant.localTools.contains(LocalToolOption.Mail),
+                        onCheckedChange = { toggleLocalTool(LocalToolOption.Mail, it) },
+                    )
+                }
+            )
+            item(
+                headlineContent = {
                     Text(stringResource(R.string.assistant_page_local_tools_camera_photo_title))
                 },
                 supportingContent = {

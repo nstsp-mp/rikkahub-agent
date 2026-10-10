@@ -204,8 +204,20 @@ val appModule = module {
             storageVolumeGrantStore = get(),
             okHttpClient = get(),
             keyboardApiClient = get(),
+            mailAuthManager = get(),
+            graphMailClient = get(),
         )
     }
+
+    single {
+        me.rerere.rikkahub.data.mail.MailAuthManager(
+            context = get(),
+            appScope = get<AppScope>(),
+            okHttpClient = get(),
+            json = get(),
+        )
+    }
+    single { me.rerere.rikkahub.data.mail.GraphMailClient(okHttpClient = get(), auth = get()) }
 
     single {
         UpdateChecker(

@@ -500,6 +500,10 @@ class RouteActivity : ComponentActivity() {
                                 SettingMcpPage()
                             }
 
+                            entry<Screen.SettingMail> {
+                                me.rerere.rikkahub.ui.pages.setting.SettingMailPage()
+                            }
+
                             entry<Screen.SettingSubAgents> {
                                 SettingSubAgentsPage()
                             }
@@ -788,6 +792,9 @@ sealed interface Screen : NavKey {
 
     @Serializable
     data object SettingMcp : Screen
+
+    @Serializable
+    data object SettingMail : Screen
 
     @Serializable
     data object SettingSubAgents : Screen
