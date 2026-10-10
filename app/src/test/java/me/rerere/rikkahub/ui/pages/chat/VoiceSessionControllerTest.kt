@@ -38,7 +38,7 @@ class VoiceSessionControllerTest {
         }
     }
 
-    private class Rig {
+    private class Rig(idleReconnectMs: Long = 120_000) {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
         val queue = MessageQueue()
         val asrs = mutableListOf<FakeAsr>()
@@ -47,7 +47,12 @@ class VoiceSessionControllerTest {
         val playback = CompletableDeferred<Unit>()
         var stopCount = 0
         var failPlayback = false
-        val voice = VoiceSessionController(scope, getString = { it.toString() }) { text ->
+        val voice = VoiceSessionController(
+            scope,
+            getString = { it.toString() },
+            reconnectDelaysMs = listOf(1, 1),
+            idleReconnectMs = idleReconnectMs,
+        ) { text ->
             assertTrue(asrs.last().disposed)
             CompletableDeferred<String?>().also {
                 replies.add(it)
@@ -57,7 +62,6 @@ class VoiceSessionControllerTest {
         fun start() = voice.start(
             { FakeAsr().also { asrs.add(it) } },
             {
-                assertTrue(asrs.all { asr -> asr.disposed })
                 spoken.add(it)
                 if (failPlayback) error("playback failed")
                 playback.await()
@@ -172,13 +176,14 @@ class VoiceSessionControllerTest {
             assertTrue(rig.spoken.isEmpty())
             rig.replies[0].complete("reply one")
             awaitCondition { rig.spoken.size == 1 }
-            assertTrue(idle.disposed)
+            assertFalse(idle.disposed) // The recognition connection stays open during playback.
             assertEquals(listOf("reply one"), rig.spoken)
             assertEquals(VoicePhase.Speaking, rig.voice.state.value.phase)
             rig.playback.complete(Unit)
             awaitCondition { rig.spoken.size == 2 }
             assertEquals(listOf("reply one", "reply two"), rig.spoken)
-            rig.recorder(idle)
+            awaitCondition { rig.voice.state.value.phase == VoicePhase.Listening }
+            assertFalse(idle.disposed)
         } finally { rig.close() }
     }
 
@@ -226,6 +231,143 @@ class VoiceSessionControllerTest {
         } finally { rig.close() }
     }
 
+    @Test fun `dropped recognition connection reconnects without ending the session`() = runBlocking<Unit> {
+        val rig = Rig()
+        try {
+            rig.start()
+            val first = rig.recorder()
+            first.end("first")
+            val dropped = rig.recorder(first)
+            dropped.state.value = dropped.state.value.copy(errorMessage = "socket closed")
+            val reconnected = rig.recorder(dropped)
+            assertTrue(dropped.disposed)
+            assertTrue(rig.voice.state.value.isActive)
+            // A successful utterance resets the retry budget, so later drops reconnect too.
+            reconnected.end("second")
+            var current = rig.recorder(reconnected)
+            repeat(2) {
+                current.state.value = current.state.value.copy(errorMessage = "socket closed")
+                current = rig.recorder(current)
+            }
+            assertTrue(rig.voice.state.value.isActive)
+            assertEquals(2, rig.replies.size)
+        } finally { rig.close() }
+    }
+
+    @Test fun `silence recycles the recognition connection instead of timing out`() = runBlocking<Unit> {
+        val rig = Rig(idleReconnectMs = 20)
+        try {
+            rig.start()
+            var current = rig.recorder()
+            repeat(4) { current = rig.recorder(current) }
+            assertTrue(rig.voice.state.value.isActive)
+            assertTrue(rig.replies.isEmpty())
+        } finally { rig.close() }
+    }
+
+    @Test fun `stop command cancels unspoken replies without reaching the model`() = runBlocking<Unit> {
+        val rig = Rig()
+        try {
+            rig.start()
+            val first = rig.recorder()
+            first.end("first")
+            val second = rig.recorder(first)
+            second.end("Stop.")
+            val third = rig.recorder(second)
+            assertEquals(1, rig.replies.size)
+            rig.replies[0].complete("long reply")
+            awaitCondition { rig.voice.state.value.pendingReplies == 0 }
+            assertFalse(third.disposed)
+            third.end("after")
+            rig.recorder(third)
+            rig.replies[1].complete("spoken reply")
+            awaitCondition { rig.spoken.isNotEmpty() }
+            assertEquals(listOf("spoken reply"), rig.spoken)
+        } finally { rig.close() }
+    }
+
+    @Test fun `stop during playback interrupts the reply and skips queued replies`() = runBlocking<Unit> {
+        val rig = Rig()
+        try {
+            rig.start()
+            val first = rig.recorder()
+            first.end("first")
+            val second = rig.recorder(first)
+            second.end("second")
+            val idle = rig.recorder(second)
+            rig.replies[0].complete("reply one")
+            awaitCondition { rig.spoken.size == 1 }
+            val listener = idle
+            assertEquals(VoicePhase.Speaking, rig.voice.state.value.phase)
+            listener.end("Stop.")
+            awaitCondition { rig.stopCount == 2 }
+            val resumed = rig.recorder(listener)
+            rig.replies[1].complete("reply two")
+            awaitCondition { rig.voice.state.value.pendingReplies == 0 }
+            assertFalse(resumed.disposed)
+            assertEquals(listOf("reply one"), rig.spoken)
+            assertEquals(2, rig.replies.size)
+        } finally { rig.close() }
+    }
+
+    @Test fun `other speech during playback is discarded`() = runBlocking<Unit> {
+        val rig = Rig()
+        try {
+            rig.start()
+            val asr = rig.recorder()
+            asr.end("hello")
+            val idle = rig.recorder(asr)
+            rig.replies.single().complete("reply")
+            awaitCondition { rig.spoken.size == 1 }
+            val listener = idle
+            listener.end("reply echoed by the speaker")
+            val next = rig.recorder(listener)
+            assertEquals(VoicePhase.Speaking, rig.voice.state.value.phase)
+            rig.playback.complete(Unit)
+            awaitCondition { rig.voice.state.value.phase == VoicePhase.Listening }
+            assertFalse(next.disposed)
+            assertEquals(1, rig.replies.size)
+            assertEquals(1, rig.stopCount)
+        } finally { rig.close() }
+    }
+
+    @Test fun `goodbye during playback ends voice mode`() = runBlocking<Unit> {
+        val rig = Rig()
+        try {
+            rig.start()
+            val asr = rig.recorder()
+            asr.end("hello")
+            val idle = rig.recorder(asr)
+            rig.replies.single().complete("reply")
+            awaitCondition { rig.spoken.size == 1 }
+            idle.end("Goodbye.")
+            awaitCondition { rig.voice.state.value.phase == VoicePhase.Off && rig.stopCount == 2 }
+            assertTrue(rig.asrs.all { it.disposed })
+        } finally { rig.close() }
+    }
+
+    @Test fun `end command ends voice mode`() = runBlocking<Unit> {
+        val rig = Rig()
+        try {
+            rig.start()
+            val asr = rig.recorder()
+            asr.end("Okay, end voice mode.")
+            awaitCondition { rig.voice.state.value.phase == VoicePhase.Off }
+            assertTrue(rig.asrs.all { it.disposed })
+            assertTrue(rig.replies.isEmpty())
+        } finally { rig.close() }
+    }
+
+    @Test fun `voice commands match whole utterances only`() {
+        assertEquals(VoiceCommand.CancelReplies, parseVoiceCommand("Stop."))
+        assertEquals(VoiceCommand.CancelReplies, parseVoiceCommand("okay, never mind"))
+        assertEquals(VoiceCommand.EndSession, parseVoiceCommand("Goodbye!"))
+        assertEquals(VoiceCommand.EndSession, parseVoiceCommand("End voice mode, please."))
+        assertNull(parseVoiceCommand("Stop the timer"))
+        assertNull(parseVoiceCommand("How do I end voice mode?"))
+        assertNull(parseVoiceCommand(""))
+    }
+
     @Test fun `ASR generation and playback errors stop capture and pause voice mode`() = runBlocking<Unit> {
         for (failure in listOf("asr", "generation", "playback")) {
             val rig = Rig()
@@ -233,7 +375,12 @@ class VoiceSessionControllerTest {
                 rig.start()
                 val asr = rig.recorder()
                 if (failure == "asr") {
-                    asr.state.value = asr.state.value.copy(errorMessage = "offline")
+                    // Fails the first connection and both reconnects.
+                    var current = asr
+                    repeat(3) {
+                        current.state.value = current.state.value.copy(errorMessage = "offline")
+                        if (it < 2) current = rig.recorder(current)
+                    }
                 } else {
                     asr.end("hello")
                     rig.recorder(asr)
