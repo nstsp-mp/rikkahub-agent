@@ -286,6 +286,65 @@ class VoiceSessionControllerTest {
         } finally { rig.close() }
     }
 
+    @Test fun `stop during playback interrupts the reply and skips queued replies`() = runBlocking<Unit> {
+        val rig = Rig()
+        try {
+            rig.start()
+            val first = rig.recorder()
+            first.end("first")
+            val second = rig.recorder(first)
+            second.end("second")
+            val idle = rig.recorder(second)
+            rig.replies[0].complete("reply one")
+            awaitCondition { rig.spoken.size == 1 }
+            val listener = rig.recorder(idle)
+            assertEquals(VoicePhase.Speaking, rig.voice.state.value.phase)
+            listener.end("Stop.")
+            awaitCondition { rig.stopCount == 2 }
+            val resumed = rig.recorder(listener)
+            rig.replies[1].complete("reply two")
+            awaitCondition { rig.voice.state.value.pendingReplies == 0 }
+            assertFalse(resumed.disposed)
+            assertEquals(listOf("reply one"), rig.spoken)
+            assertEquals(2, rig.replies.size)
+        } finally { rig.close() }
+    }
+
+    @Test fun `other speech during playback is discarded`() = runBlocking<Unit> {
+        val rig = Rig()
+        try {
+            rig.start()
+            val asr = rig.recorder()
+            asr.end("hello")
+            val idle = rig.recorder(asr)
+            rig.replies.single().complete("reply")
+            awaitCondition { rig.spoken.size == 1 }
+            val listener = rig.recorder(idle)
+            listener.end("reply echoed by the speaker")
+            val next = rig.recorder(listener)
+            assertEquals(VoicePhase.Speaking, rig.voice.state.value.phase)
+            rig.playback.complete(Unit)
+            awaitCondition { next.disposed && rig.voice.state.value.phase == VoicePhase.Listening }
+            assertEquals(1, rig.replies.size)
+            assertEquals(1, rig.stopCount)
+        } finally { rig.close() }
+    }
+
+    @Test fun `goodbye during playback ends voice mode`() = runBlocking<Unit> {
+        val rig = Rig()
+        try {
+            rig.start()
+            val asr = rig.recorder()
+            asr.end("hello")
+            val idle = rig.recorder(asr)
+            rig.replies.single().complete("reply")
+            awaitCondition { rig.spoken.size == 1 }
+            rig.recorder(idle).end("Goodbye.")
+            awaitCondition { rig.voice.state.value.phase == VoicePhase.Off && rig.stopCount == 2 }
+            assertTrue(rig.asrs.all { it.disposed })
+        } finally { rig.close() }
+    }
+
     @Test fun `end command ends voice mode`() = runBlocking<Unit> {
         val rig = Rig()
         try {
