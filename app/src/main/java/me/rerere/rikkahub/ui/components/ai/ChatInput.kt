@@ -95,6 +95,7 @@ import me.rerere.rikkahub.data.datastore.Settings
 import me.rerere.rikkahub.data.datastore.getCurrentAssistant
 import me.rerere.rikkahub.data.datastore.getCurrentChatModel
 import me.rerere.rikkahub.data.datastore.getQuickMessagesOfAssistant
+import me.rerere.rikkahub.data.datastore.getSelectedASRProvider
 import me.rerere.rikkahub.data.files.FilesManager
 import me.rerere.rikkahub.data.model.Assistant
 import me.rerere.rikkahub.data.model.QuickMessage
@@ -105,9 +106,6 @@ import me.rerere.rikkahub.ui.components.ai.completion.ChatCompletionItem
 import me.rerere.rikkahub.ui.components.ai.completion.ChatCompletionList
 import me.rerere.rikkahub.ui.components.ai.completion.ChatCompletionProvider
 import me.rerere.rikkahub.ui.components.ui.KeepScreenOn
-import me.rerere.rikkahub.ui.components.ui.permission.PermissionManager
-import me.rerere.rikkahub.ui.components.ui.permission.PermissionRecordAudio
-import me.rerere.rikkahub.ui.components.ui.permission.rememberPermissionState
 import me.rerere.rikkahub.ui.context.LocalASRState
 import me.rerere.rikkahub.ui.context.LocalSettings
 import me.rerere.rikkahub.ui.context.LocalToaster
@@ -181,9 +179,7 @@ fun ChatInput(
     LaunchedEffect(Unit) {
         soundEffectPlayer.preload(R.raw.asr_start, R.raw.asr_stop)
     }
-    val asrPermission = rememberPermissionState(PermissionRecordAudio)
-    PermissionManager(permissionState = asrPermission)
-    var asrBaseText by remember { mutableStateOf("") }
+    val toggleDictation = rememberDictationToggle(state)
     LaunchedEffect(asrState.status) {
         when (asrState.status) {
             ASRStatus.Listening -> {
@@ -330,29 +326,22 @@ fun ChatInput(
                             )
                         }
 
-                        if (!voiceState.isActive && (asrState.isAvailable || asrState.isRecording)) {
-                            AsrButton(
-                                state = asrState,
-                                onClick = {
-                                    when (asrState.status) {
-                                        ASRStatus.Listening -> asr.stop()
-                                        ASRStatus.Idle, ASRStatus.Error -> {
-                                            if (!asrPermission.allRequiredPermissionsGranted) {
-                                                asrPermission.requestPermissions()
-                                            } else {
-                                                asrBaseText = state.textContent.text.toString()
-                                                asr.start { transcript ->
-                                                    val spacer =
-                                                        if (asrBaseText.isBlank() || transcript.isBlank()) "" else " "
-                                                    state.setMessageText(asrBaseText + spacer + transcript)
-                                                }
-                                            }
-                                        }
+                        // Voice mode owns this slot; dictation lives in the + menu and only shows
+                        // here while recording, or for ASR providers that cannot run voice mode.
+                        val voiceModeSupported =
+                            settings.getSelectedASRProvider()?.supportsServerVadVoiceMode == true
+                        when {
+                            asrState.isRecording || (!voiceModeSupported &&asrState.isAvailable && !voiceState.isActive) ->
+                                AsrButton(state = asrState, onClick = { toggleDictation() })
 
-                                        ASRStatus.Connecting, ASRStatus.Stopping -> {}
+                            voiceModeSupported && voiceState.phase == VoicePhase.Off && onStartVoiceMode != null ->
+                                VoiceModeButton(
+                                    onClick = {
+                                        focusManager.clearFocus(force = true)
+                                        keyboardController?.hide()
+                                        onStartVoiceMode()
                                     }
-                                }
-                            )
+                                )
                         }
 
                         if (loading) {

@@ -47,9 +47,62 @@ import me.rerere.rikkahub.R
 import me.rerere.asr.ASRStatus
 import me.rerere.hugeicons.HugeIcons
 import me.rerere.hugeicons.stroke.Voice
+import me.rerere.rikkahub.ui.components.ui.permission.PermissionManager
+import me.rerere.rikkahub.ui.components.ui.permission.PermissionRecordAudio
+import me.rerere.rikkahub.ui.components.ui.permission.rememberPermissionState
+import me.rerere.rikkahub.ui.context.LocalASRState
+import me.rerere.rikkahub.ui.hooks.ChatInputState
 
 private enum class AsrDisplayState {
     Idle, Connecting, Active
+}
+
+/**
+ * Starts dictation into the message box, or stops it if it is listening. Returns false when it
+ * asked for the microphone permission instead.
+ */
+@Composable
+internal fun rememberDictationToggle(state: ChatInputState): () -> Boolean {
+    val asr = LocalASRState.current
+    val permission = rememberPermissionState(PermissionRecordAudio)
+    PermissionManager(permissionState = permission)
+    return {
+        when (asr.state.value.status) {
+            ASRStatus.Listening -> {
+                asr.stop()
+                true
+            }
+            ASRStatus.Idle, ASRStatus.Error -> if (!permission.allRequiredPermissionsGranted) {
+                permission.requestPermissions()
+                false
+            } else {
+                val baseText = state.textContent.text.toString()
+                asr.start { transcript ->
+                    val spacer = if (baseText.isBlank() || transcript.isBlank()) "" else " "
+                    state.setMessageText(baseText + spacer + transcript)
+                }
+                true
+            }
+            ASRStatus.Connecting, ASRStatus.Stopping -> true
+        }
+    }
+}
+
+@Composable
+internal fun VoiceModeButton(onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        modifier = Modifier.size(36.dp),
+        shape = CircleShape,
+        color = Color.Transparent,
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(
+                imageVector = HugeIcons.Voice,
+                contentDescription = stringResource(R.string.chat_page_voice_title),
+            )
+        }
+    }
 }
 
 @Composable

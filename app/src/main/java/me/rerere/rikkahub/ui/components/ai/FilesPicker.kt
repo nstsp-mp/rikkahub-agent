@@ -53,7 +53,7 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Deferred
 import me.rerere.ai.provider.ProviderSetting
 import me.rerere.hugeicons.HugeIcons
-import me.rerere.hugeicons.stroke.Voice
+import me.rerere.hugeicons.stroke.Mic01
 import me.rerere.hugeicons.stroke.Camera01
 import me.rerere.hugeicons.stroke.Codesandbox
 import me.rerere.hugeicons.stroke.ComputerTerminal01
@@ -107,7 +107,7 @@ internal fun FilesPicker(
     onPickVideo: () -> Unit,
     onPickAudio: () -> Unit,
     onPickFile: () -> Unit,
-    onStartVoiceMode: (() -> Unit)? = null,
+    onDictate: (() -> Unit)? = null,
 ) {
     val settings = LocalSettings.current
     val provider = settings.getCurrentChatModel()?.findProvider(providers = settings.providers)
@@ -137,11 +137,11 @@ internal fun FilesPicker(
 
             FilePickButton(onClick = onPickFile)
 
-            onStartVoiceMode?.let { start ->
+            onDictate?.let { dictate ->
                 BigIconTextButton(
-                    icon = { Icon(HugeIcons.Voice, contentDescription = null) },
-                    text = { Text(stringResource(R.string.chat_page_voice_title)) },
-                    onClick = start,
+                    icon = { Icon(HugeIcons.Mic01, contentDescription = null) },
+                    text = { Text(stringResource(R.string.asr_button_content_description)) },
+                    onClick = dictate,
                 )
             }
         }

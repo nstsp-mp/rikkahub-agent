@@ -73,6 +73,8 @@ import me.rerere.rikkahub.service.ChatError
 import me.rerere.rikkahub.ui.components.ai.ChatAttachmentPickerActions
 import me.rerere.rikkahub.ui.components.ai.ChatInput
 import me.rerere.rikkahub.ui.components.ai.FilesPicker
+import me.rerere.rikkahub.ui.components.ai.rememberDictationToggle
+import me.rerere.rikkahub.ui.context.LocalASRState
 import me.rerere.rikkahub.ui.components.ai.SearchMode
 import me.rerere.rikkahub.ui.components.ai.completion.WorkspaceCompletionProvider
 import me.rerere.rikkahub.ui.components.ai.rememberChatAttachmentPickerActions
@@ -532,7 +534,6 @@ private fun ChatPageContent(
                 assistant = assistant,
                 vm = vm,
                 attachmentPickerActions = attachmentPickerActions,
-                onStartVoiceMode = onStartVoiceMode,
                 onDismiss = { showFilesSheet = false },
             )
         }
@@ -547,12 +548,11 @@ private fun ChatFilesPickerSheet(
     assistant: Assistant,
     vm: ChatVM,
     attachmentPickerActions: ChatAttachmentPickerActions,
-    onStartVoiceMode: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     val voiceState by vm.voiceSession.state.collectAsStateWithLifecycle()
-    val focusManager = LocalFocusManager.current
-    val keyboardController = LocalSoftwareKeyboardController.current
+    val asrState by LocalASRState.current.state.collectAsStateWithLifecycle()
+    val toggleDictation = rememberDictationToggle(inputState)
     var showInjectionSheet by remember { mutableStateOf(false) }
     var showCompressDialog by remember { mutableStateOf(false) }
 
@@ -605,16 +605,8 @@ private fun ChatFilesPickerSheet(
             onPickVideo = attachmentPickerActions.onPickVideo,
             onPickAudio = attachmentPickerActions.onPickAudio,
             onPickFile = attachmentPickerActions.onPickFile,
-            onStartVoiceMode = if (
-                setting.getSelectedASRProvider()?.supportsServerVadVoiceMode == true &&
-                voiceState.phase == VoicePhase.Off
-            ) {
-                {
-                    dismissAll()
-                    focusManager.clearFocus(force = true)
-                    keyboardController?.hide()
-                    onStartVoiceMode()
-                }
+            onDictate = if (asrState.isAvailable && !asrState.isRecording && voiceState.phase == VoicePhase.Off) {
+                { if (toggleDictation()) dismissAll() }
             } else null,
         )
     }
