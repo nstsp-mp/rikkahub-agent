@@ -451,6 +451,8 @@
   <string name="notification_web_server_running">Web Server Running</string>
   <string name="notification_web_server_starting">Starting...</string>
   <string name="notification_web_server_stop">Stop</string>
+  <string name="permission_bluetooth_connect">Nearby devices</string>
+  <string name="permission_bluetooth_connect_desc">Lets voice mode use a connected Bluetooth headset for the microphone and speaker</string>
   <string name="permission_camera">Camera</string>
   <string name="permission_camera_desc">Camera permission is required to take photos</string>
   <string name="permission_desc_goto_setting">Some permissions have been permanently denied, please go to the app settings to manually enable them:</string>

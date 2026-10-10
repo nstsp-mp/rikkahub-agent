@@ -2,6 +2,7 @@ package me.rerere.rikkahub.ui.pages.chat
 
 import me.rerere.rikkahub.R
 import android.content.Context
+import android.os.Build
 import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.media.AudioManager
@@ -9,7 +10,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.lifecycle.Lifecycle
@@ -29,6 +33,7 @@ import me.rerere.rikkahub.data.datastore.Settings
 import me.rerere.rikkahub.data.datastore.getCurrentChatModel
 import me.rerere.rikkahub.data.datastore.getSelectedASRProvider
 import me.rerere.rikkahub.data.datastore.getSelectedTTSProvider
+import me.rerere.rikkahub.ui.components.ui.permission.PermissionBluetoothConnect
 import me.rerere.rikkahub.ui.components.ui.permission.PermissionManager
 import me.rerere.rikkahub.ui.components.ui.permission.PermissionRecordAudio
 import me.rerere.rikkahub.ui.components.ui.permission.rememberPermissionState
@@ -50,7 +55,17 @@ fun rememberVoiceModeStarter(vm: ChatVM, settings: Settings): () -> Unit {
     val asr = LocalASRState.current
     val tts = LocalTTSState.current
     val toaster = LocalToaster.current
-    val permission = rememberPermissionState(PermissionRecordAudio)
+    // BLUETOOTH_CONNECT is optional: without it the headset isn't offered as a communication device
+    // and voice mode falls back to the phone's mic and speaker.
+    val permission = rememberPermissionState(
+        remember {
+            buildSet {
+                add(PermissionRecordAudio)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) add(PermissionBluetoothConnect)
+            }
+        }
+    )
+    var optionalPermissionsAsked by rememberSaveable { mutableStateOf(false) }
     PermissionManager(permission)
     val voice = vm.voiceSession
     val state by voice.state.collectAsStateWithLifecycle()
@@ -90,7 +105,15 @@ fun rememberVoiceModeStarter(vm: ChatVM, settings: Settings): () -> Unit {
         }
         when {
             blocked != null -> toaster.show(message = blocked)
-            !permission.allRequiredPermissionsGranted -> permission.requestPermissions()
+            !permission.allRequiredPermissionsGranted -> {
+                optionalPermissionsAsked = true
+                permission.requestPermissions()
+            }
+            !permission.allPermissionsGranted && !optionalPermissionsAsked &&
+                permission.permanentlyDeniedPermissions.isEmpty() -> {
+                optionalPermissionsAsked = true
+                permission.requestPermissions()
+            }
             else -> audioRoute.acquireBluetoothCommunicationRoute().fold(
                 onSuccess = {
                     voice.start(
